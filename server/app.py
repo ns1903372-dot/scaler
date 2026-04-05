@@ -317,11 +317,14 @@ GET /state</pre>
       return JSON.stringify(value, null, 2);
     }
 
-    function setMetrics(observation) {
-      const visibleCase = observation?.visible_case || {};
-      document.getElementById("metric-task").textContent = visibleCase.task_id || observation?.metadata?.task_id || "-";
-      document.getElementById("metric-score").textContent = String(observation?.score ?? observation?.reward ?? 0.0);
-      document.getElementById("metric-done").textContent = String(observation?.done ?? false);
+    function setMetrics(data) {
+      const visibleCase = data?.visible_case || {};
+      const taskId = visibleCase.task_id || data?.task_id || data?.metadata?.task_id || "-";
+      const score = data?.score ?? data?.reward ?? 0.0;
+      const done = data?.done ?? (data?.resolution_status ? data.resolution_status !== "active" : false);
+      document.getElementById("metric-task").textContent = String(taskId);
+      document.getElementById("metric-score").textContent = String(score);
+      document.getElementById("metric-done").textContent = String(done);
     }
 
     async function loadTasks() {
@@ -346,6 +349,7 @@ GET /state</pre>
       const res = await fetch("/state");
       const data = await res.json();
       stateBox.textContent = pretty(data);
+      setMetrics(data);
     }
 
     async function resetTask() {
