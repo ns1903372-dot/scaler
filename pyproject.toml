@@ -17,9 +17,8 @@ dependencies = [
   "httpx>=0.27.0",
   "pytest>=8.3.0",
   "PyYAML>=6.0.2",
-  "openenv @ git+https://github.com/meta-pytorch/OpenEnv.git",
 ]
 
 [tool.setuptools]
-packages = ["retail_ops_env", "retail_ops_env.server", "server"]
+packages = ["openenv", "openenv.core", "openenv.core.env_server", "retail_ops_env", "retail_ops_env.server", "server"]
 py-modules = ["client", "models", "tasks", "graders", "validate_submission", "inference"]
