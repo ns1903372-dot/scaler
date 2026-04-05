@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Type
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from pydantic import BaseModel
 
 
@@ -24,7 +24,7 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
         return {"name": env_name, "status": "ok"}
 
     @app.post("/reset", response_model=observation_model)
-    def reset(body: ResetBody | None = None):
+    def reset(body: ResetBody | None = Body(default=None)):
         body = body or ResetBody()
         return env.reset(
             seed=body.seed,
@@ -34,7 +34,7 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
         )
 
     @app.post("/step")
-    def step(body: StepBody):
+    def step(body: StepBody = Body(...)):
         observation = env.step(body.action)
         return {
             "observation": observation.model_dump(),
