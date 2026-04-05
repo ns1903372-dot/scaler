@@ -4,6 +4,7 @@ import traceback
 from typing import Any, Type
 
 from fastapi import Body, FastAPI
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -44,11 +45,12 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
         try:
             observation = env.step(body.action)
             last_error = {}
-            return {
-                "observation": observation.model_dump(),
-                "reward": observation.reward,
-                "done": observation.done,
+            payload = {
+                "observation": jsonable_encoder(observation),
+                "reward": float(observation.reward),
+                "done": bool(observation.done),
             }
+            return JSONResponse(status_code=200, content=payload)
         except Exception as exc:  # noqa: BLE001
             last_error = {
                 "error": str(exc),
