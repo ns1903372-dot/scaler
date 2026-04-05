@@ -476,8 +476,7 @@ GET /state</pre>
     stepBtn.addEventListener("click", sendStep);
     stateBtn.addEventListener("click", refreshState);
     taskSelect.addEventListener("change", () => {
-      setUiStatus(`Switching to ${taskSelect.value}...`);
-      resetTask();
+      setUiStatus(`Task selected: ${taskSelect.value}. Click Reset Task to load it.`);
     });
 
     Promise.all([loadTasks(), checkHealth(), refreshState()]).catch(() => {
