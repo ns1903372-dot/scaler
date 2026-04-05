@@ -6,83 +6,81 @@ from typing import Any
 
 from openai import OpenAI
 
-from retail_ops_env.graders import grade_task
 from retail_ops_env.models import RetailOpsAction
 from retail_ops_env.server.case_resolution_env import RetailOpsEnvironment
 from retail_ops_env.tasks import TASKS
 
 
-SYSTEM_PROMPT = """You are an operations agent solving a retail support case.
-Return valid JSON only with this schema:
-{
-  "actions": [
-    {
-      "command": "...",
-      "order_id": "... or null",
-      "reference_id": "... or null",
-      "payload": {...},
-      "rationale": "..."
-    }
-  ]
-}
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+API_KEY = os.getenv("HF_TOKEN")
+BENCHMARK = "retail_ops_env"
+MAX_STEPS = 10
+
+SYSTEM_PROMPT = """You are solving a retail support case.
+Return valid JSON only in this shape:
+{"actions":[{"command":"...","order_id":null,"reference_id":null,"payload":{},"rationale":"..."}]}
 Keep the plan short and deterministic."""
 
 
-def emit(tag: str, payload: dict[str, Any]) -> None:
-    print(f"{tag} {json.dumps(payload, separators=(',', ':'), ensure_ascii=False)}", flush=True)
-
-
-def require_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"Missing required environment variable: {name}")
-    return value
+def require_token() -> str:
+    if not API_KEY:
+        raise RuntimeError("Missing required environment variable: HF_TOKEN")
+    return API_KEY
 
 
 def build_client() -> OpenAI:
-    base_url = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-    api_key = require_env("HF_TOKEN")
-    return OpenAI(base_url=base_url, api_key=api_key)
+    return OpenAI(base_url=API_BASE_URL, api_key=require_token())
 
 
-def log_start(task: dict[str, Any]) -> None:
-    payload = {
-        "task_id": task["id"],
-        "difficulty": task["difficulty"],
-        "title": task["title"],
-        "max_steps": task["max_steps"],
-    }
-    emit("[START]", payload)
+def fmt_bool(value: bool) -> str:
+    return "true" if value else "false"
 
 
-def log_step(task_id: str, step_index: int, action: RetailOpsAction, observation: Any) -> None:
-    payload = {
-        "task_id": task_id,
-        "step": step_index,
-        "command": action.command,
-        "order_id": action.order_id,
-        "reference_id": action.reference_id,
-        "reward": observation.reward,
-        "score": observation.score,
-        "done": observation.done,
-    }
-    emit("[STEP]", payload)
+def fmt_reward(value: float) -> str:
+    return f"{float(value):.2f}"
 
 
-def log_end(task_id: str, score: float, steps: int, breakdown: dict[str, float]) -> None:
-    payload = {
-        "task_id": task_id,
-        "final_score": score,
-        "steps": steps,
-        "breakdown": breakdown,
-    }
-    emit("[END]", payload)
+def action_to_str(action: RetailOpsAction) -> str:
+    parts: list[str] = []
+    if action.order_id:
+        parts.append(f"order_id='{action.order_id}'")
+    if action.reference_id:
+        parts.append(f"reference_id='{action.reference_id}'")
+    if action.payload:
+        parts.append(f"payload={json.dumps(action.payload, separators=(',', ':'), ensure_ascii=False)}")
+    return f"{action.command}({', '.join(parts)})" if parts else f"{action.command}()"
+
+
+def extract_error(observation: Any) -> str | None:
+    if getattr(observation, "last_action_success", True):
+        return None
+    return getattr(observation, "last_action_message", None) or "unknown_error"
+
+
+def log_start(task_name: str, env: str, model: str) -> None:
+    print(f"[START] task={task_name} env={env} model={model}", flush=True)
+
+
+def log_step(step: int, action: str, reward: float, done: bool, error: str | None) -> None:
+    error_value = error if error is not None else "null"
+    print(
+        f"[STEP] step={step} action={action} reward={fmt_reward(reward)} done={fmt_bool(done)} error={error_value}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+    rewards_str = ",".join(fmt_reward(value) for value in rewards)
+    print(
+        f"[END] success={fmt_bool(success)} steps={steps} score={fmt_reward(score)} rewards={rewards_str}",
+        flush=True,
+    )
 
 
 def plan_actions(client: OpenAI, task: dict[str, Any], visible_case: dict[str, Any]) -> list[RetailOpsAction]:
-    model = os.getenv("MODEL_NAME", "gpt-4.1-mini")
     response = client.responses.create(
-        model=model,
+        model=MODEL_NAME,
         temperature=0,
         input=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -93,13 +91,12 @@ def plan_actions(client: OpenAI, task: dict[str, Any], visible_case: dict[str, A
                         "task": task,
                         "visible_case": visible_case,
                         "instructions": "Produce a concise action plan that should solve the case with no unnecessary actions.",
-                    },
+                    }
                 ),
             },
         ],
     )
-    content = response.output_text.strip()
-    plan = json.loads(content)
+    plan = json.loads(response.output_text.strip())
     return [RetailOpsAction.model_validate(item) for item in plan.get("actions", [])]
 
 
@@ -172,31 +169,42 @@ def default_actions(task_id: str) -> list[RetailOpsAction]:
     ]
 
 
-def run_task(client: OpenAI, env: RetailOpsEnvironment, task: dict[str, Any]) -> float:
-    log_start(task)
-    reset_obs = env.reset(task_id=task["id"])
+def run_task(client: OpenAI, env: RetailOpsEnvironment, task: dict[str, Any]) -> None:
+    rewards: list[float] = []
+    steps = 0
+    success = False
+    final_score = 0.0
+    log_start(task["id"], BENCHMARK, MODEL_NAME)
+
     try:
-        actions = plan_actions(client, task, reset_obs.visible_case)
+        reset_obs = env.reset(task_id=task["id"])
+        try:
+            actions = plan_actions(client, task, reset_obs.visible_case)
+        except Exception:
+            actions = default_actions(task["id"])
+
+        if not actions:
+            actions = default_actions(task["id"])
+
+        for step_index, action in enumerate(actions[:MAX_STEPS], start=1):
+            observation = env.step(action)
+            reward = float(observation.reward)
+            rewards.append(reward)
+            steps = step_index
+            log_step(step_index, action_to_str(action), reward, bool(observation.done), extract_error(observation))
+            final_score = float(getattr(observation, "score", reward))
+            if observation.done:
+                success = final_score > 0.0
+                break
+        else:
+            success = final_score > 0.0
     except Exception:
-        actions = default_actions(task["id"])
-
-    if not actions:
-        actions = default_actions(task["id"])
-
-    final_obs = reset_obs
-    for step_index, action in enumerate(actions, start=1):
-        final_obs = env.step(action)
-        log_step(task["id"], step_index, action, final_obs)
-        if final_obs.done:
-            break
-
-    score, breakdown = grade_task(task, env._workspace)  # noqa: SLF001 - benchmark script only
-    log_end(task["id"], score, env.state.step_count, breakdown)
-    return score
+        success = False
+    finally:
+        log_end(success, steps, final_score, rewards)
 
 
 def main() -> None:
-    require_env("HF_TOKEN")
     client = build_client()
     env = RetailOpsEnvironment()
     for task in TASKS:
