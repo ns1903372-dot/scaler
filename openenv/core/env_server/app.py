@@ -19,7 +19,7 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
         task_id: str | None = None
         metadata: dict[str, Any] = {}
 
-    @app.get("/")
+    @app.get("/api")
     def root() -> dict[str, str]:
         return {"name": env_name, "status": "ok"}
 
@@ -47,4 +47,3 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
         return env.state.model_dump()
 
     return app
-

@@ -92,6 +92,22 @@ Run the API:
 uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
 
+Open the browser UI at `/` for:
+
+- task selector
+- reset button
+- step button
+- input fields for command, ids, and payload JSON
+- formatted response and state output
+
+API endpoints remain available at:
+
+- `GET /tasks`
+- `POST /reset`
+- `POST /step`
+- `GET /state`
+- `GET /health`
+
 Run the baseline inference:
 
 ```bash
