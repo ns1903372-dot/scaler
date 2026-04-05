@@ -458,7 +458,10 @@ GET /state</pre>
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action })
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
         const data = await res.json();
         responseBox.textContent = pretty(data);
         setMetrics(data.observation || data);
