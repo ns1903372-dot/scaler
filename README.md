@@ -1,6 +1,6 @@
 ---
 title: Retail Ops OpenEnv
-emoji: "package"
+emoji: "📦"
 colorFrom: blue
 colorTo: green
 sdk: docker
