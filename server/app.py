@@ -468,9 +468,17 @@ GET /state</pre>
       healthStatus.textContent = data.status === "ok" ? "API healthy and ready" : "API status unknown";
     }
 
-    async function refreshState() {
-      setBusy(true, stateBtn, "Refreshing...");
-      setUiStatus("Refreshing current state...");
+    async function refreshState(options = {}) {
+      const {
+        showStatus = true,
+        showBusy = true
+      } = options;
+      if (showBusy) {
+        setBusy(true, stateBtn, "Refreshing...");
+      }
+      if (showStatus) {
+        setUiStatus("Refreshing current state...");
+      }
       try {
         const res = await fetch(`/state?_=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -485,15 +493,21 @@ GET /state</pre>
         });
         setMetrics(data);
         lastRefreshed.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`;
-        setUiStatus("State refreshed successfully.");
+        if (showStatus) {
+          setUiStatus("State refreshed successfully.");
+        }
         const errorRes = await fetch(`/last-error?_=${Date.now()}`, { cache: "no-store" });
         const errorData = await errorRes.json();
         errorBox.textContent = pretty(errorData || { message: "No backend errors captured." });
       } catch (error) {
         responseBox.textContent = `Refresh failed: ${error.message}`;
-        setUiStatus("Refresh State failed.", "warn");
+        if (showStatus) {
+          setUiStatus("Refresh State failed.", "warn");
+        }
       } finally {
-        setBusy(false, stateBtn, "Refresh State");
+        if (showBusy) {
+          setBusy(false, stateBtn, "Refresh State");
+        }
       }
     }
 
@@ -511,7 +525,7 @@ GET /state</pre>
         responseBox.textContent = pretty(data);
         setMetrics(data);
         setUiStatus(`Task reset: ${data?.visible_case?.task_id || taskSelect.value}`);
-        await refreshState();
+        await refreshState({ showStatus: false, showBusy: false });
       } catch (error) {
         responseBox.textContent = `Reset failed: ${error.message}`;
         setUiStatus("Reset Task failed.", "warn");
@@ -567,7 +581,7 @@ GET /state</pre>
         setMetrics(data.observation || data);
         errorBox.textContent = "No backend errors captured.";
         setUiStatus("Step sent successfully.");
-        await refreshState();
+        await refreshState({ showStatus: false, showBusy: false });
       } catch (error) {
         responseBox.textContent = `Step failed: ${error.message}`;
         setUiStatus("Step failed.", "warn");
