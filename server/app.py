@@ -257,18 +257,20 @@ UI_HTML = """<!DOCTYPE html>
 
         <label>
           Order ID
-          <input id="order-id" placeholder="ORD-1001" />
+          <input id="order-id" placeholder="Only needed for order-specific commands" />
         </label>
 
         <label>
           Reference ID
-          <input id="reference-id" placeholder="ADDR-01 / GRIND-09 / PAY-02" />
+          <input id="reference-id" placeholder="Only needed for policy or inventory lookups" />
         </label>
 
         <label>
           Payload JSON
           <textarea id="payload-box">{"message":"We are reviewing your case."}</textarea>
         </label>
+
+        <p class="hint" id="command-help">Select a command to see the recommended inputs.</p>
 
         <label>
           Rationale
@@ -333,6 +335,7 @@ GET /state</pre>
     const resetBtn = document.getElementById("reset-btn");
     const stepBtn = document.getElementById("step-btn");
     const stateBtn = document.getElementById("state-btn");
+    const commandHelp = document.getElementById("command-help");
     const payloadTemplates = {
       inspect_case: {},
       inspect_order: {},
@@ -394,12 +397,38 @@ GET /state</pre>
     function setPayloadTemplate() {
       const template = payloadTemplates[commandSelect.value] || {};
       payloadBox.value = JSON.stringify(template, null, 2);
-      if (commandSelect.value === "inspect_order") {
-        orderId.placeholder = "ORD-1001";
+      orderId.placeholder = "Only needed for order-specific commands";
+      referenceId.placeholder = "Only needed for policy or inventory lookups";
+      commandHelp.textContent = "Select a command to see the recommended inputs.";
+
+      if (commandSelect.value === "inspect_case") {
+        commandHelp.textContent = "inspect_case needs no order id, no reference id, and an empty payload.";
+      } else if (commandSelect.value === "inspect_order") {
+        orderId.placeholder = "Required, for example ORD-1001";
+        commandHelp.textContent = "inspect_order needs an order id and usually an empty payload.";
       } else if (commandSelect.value === "inspect_policy") {
-        referenceId.placeholder = "ADDR-01 / RET-07 / PAY-02";
+        referenceId.placeholder = "Required, for example ADDR-01 / RET-07 / PAY-02";
+        commandHelp.textContent = "inspect_policy needs a policy reference id.";
       } else if (commandSelect.value === "inspect_inventory") {
-        referenceId.placeholder = "GRIND-09 / JACKET-11-L";
+        referenceId.placeholder = "Required, for example GRIND-09 / JACKET-11-L";
+        commandHelp.textContent = "inspect_inventory needs an inventory SKU as reference id.";
+      } else if (commandSelect.value === "update_shipping_address") {
+        orderId.placeholder = "Required, for example ORD-1001";
+        commandHelp.textContent = "update_shipping_address needs an order id and address fields in the payload.";
+      } else if (commandSelect.value === "issue_refund") {
+        orderId.placeholder = "Required, for example ORD-4101";
+        commandHelp.textContent = "issue_refund needs an order id and refund details in the payload.";
+      } else if (commandSelect.value === "create_replacement") {
+        orderId.placeholder = "Required, for example ORD-2301";
+        commandHelp.textContent = "create_replacement needs an order id and replacement details in the payload.";
+      } else if (commandSelect.value === "send_message") {
+        commandHelp.textContent = "send_message only needs a payload with a customer-facing message.";
+      } else if (commandSelect.value === "add_internal_note") {
+        commandHelp.textContent = "add_internal_note only needs a payload with a note.";
+      } else if (commandSelect.value === "resolve_case") {
+        commandHelp.textContent = "resolve_case needs resolution_code and summary in the payload.";
+      } else if (commandSelect.value === "escalate_case") {
+        commandHelp.textContent = "escalate_case needs reason and team in the payload.";
       }
     }
 
