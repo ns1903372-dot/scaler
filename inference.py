@@ -40,7 +40,7 @@ def require_env(name: str) -> str:
 
 
 def build_client() -> OpenAI:
-    base_url = require_env("API_BASE_URL")
+    base_url = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
     api_key = require_env("HF_TOKEN")
     return OpenAI(base_url=base_url, api_key=api_key)
 
@@ -80,7 +80,7 @@ def log_end(task_id: str, score: float, steps: int, breakdown: dict[str, float])
 
 
 def plan_actions(client: OpenAI, task: dict[str, Any], visible_case: dict[str, Any]) -> list[RetailOpsAction]:
-    model = require_env("MODEL_NAME")
+    model = os.getenv("MODEL_NAME", "gpt-4.1-mini")
     response = client.responses.create(
         model=model,
         temperature=0,
@@ -196,8 +196,6 @@ def run_task(client: OpenAI, env: RetailOpsEnvironment, task: dict[str, Any]) ->
 
 
 def main() -> None:
-    require_env("API_BASE_URL")
-    require_env("MODEL_NAME")
     require_env("HF_TOKEN")
     client = build_client()
     env = RetailOpsEnvironment()
