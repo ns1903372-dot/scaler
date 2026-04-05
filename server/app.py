@@ -333,6 +333,43 @@ GET /state</pre>
     const resetBtn = document.getElementById("reset-btn");
     const stepBtn = document.getElementById("step-btn");
     const stateBtn = document.getElementById("state-btn");
+    const payloadTemplates = {
+      inspect_case: {},
+      inspect_order: {},
+      inspect_policy: {},
+      inspect_inventory: {},
+      update_shipping_address: {
+        line1: "221B Baker Street",
+        apartment: "Apt 5",
+        city: "Mumbai",
+        postal_code: "400001"
+      },
+      issue_refund: {
+        amount: 129.99,
+        reason: "duplicate charge",
+        method: "original_payment"
+      },
+      create_replacement: {
+        sku: "JACKET-11-L",
+        warehouse: "west",
+        shipping_speed: "express",
+        waive_return: true
+      },
+      send_message: {
+        message: "We are reviewing your case."
+      },
+      add_internal_note: {
+        note: "Checked policy and next action."
+      },
+      resolve_case: {
+        resolution_code: "resolved",
+        summary: "Case resolved successfully."
+      },
+      escalate_case: {
+        reason: "Manual review required.",
+        team: "escalation"
+      }
+    };
 
     function setUiStatus(message, tone = "neutral") {
       uiStatus.textContent = message;
@@ -352,6 +389,18 @@ GET /state</pre>
 
     function pretty(value) {
       return JSON.stringify(value, null, 2);
+    }
+
+    function setPayloadTemplate() {
+      const template = payloadTemplates[commandSelect.value] || {};
+      payloadBox.value = JSON.stringify(template, null, 2);
+      if (commandSelect.value === "inspect_order") {
+        orderId.placeholder = "ORD-1001";
+      } else if (commandSelect.value === "inspect_policy") {
+        referenceId.placeholder = "ADDR-01 / RET-07 / PAY-02";
+      } else if (commandSelect.value === "inspect_inventory") {
+        referenceId.placeholder = "GRIND-09 / JACKET-11-L";
+      }
     }
 
     function setMetrics(data) {
@@ -490,6 +539,12 @@ GET /state</pre>
     taskSelect.addEventListener("change", () => {
       setUiStatus(`Task selected: ${taskSelect.value}. Click Reset Task to load it.`);
     });
+    commandSelect.addEventListener("change", () => {
+      setPayloadTemplate();
+      setUiStatus(`Command selected: ${commandSelect.value}.`);
+    });
+
+    setPayloadTemplate();
 
     Promise.all([loadTasks(), checkHealth(), refreshState()]).catch(() => {
       setUiStatus("Could not initialize the UI.", "warn");
