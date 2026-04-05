@@ -131,6 +131,11 @@ UI_HTML = """<!DOCTYPE html>
       transition: transform 140ms ease, opacity 140ms ease, background 140ms ease;
     }
     button:hover { transform: translateY(-1px); }
+    button:disabled {
+      cursor: wait;
+      opacity: 0.65;
+      transform: none;
+    }
     button.primary { background: var(--accent); color: white; }
     button.secondary { background: #243042; color: white; }
     button.ghost { background: rgba(36,48,66,0.08); color: var(--ink); }
@@ -325,12 +330,24 @@ GET /state</pre>
     const healthStatus = document.getElementById("health-status");
     const uiStatus = document.getElementById("ui-status");
     const lastRefreshed = document.getElementById("last-refreshed");
+    const resetBtn = document.getElementById("reset-btn");
+    const stepBtn = document.getElementById("step-btn");
+    const stateBtn = document.getElementById("state-btn");
 
     function setUiStatus(message, tone = "neutral") {
       uiStatus.textContent = message;
       uiStatus.className = "status";
       if (tone === "neutral") uiStatus.classList.add("is-neutral");
       if (tone === "warn") uiStatus.classList.add("is-warn");
+    }
+
+    function setBusy(isBusy, button = null, label = "") {
+      [resetBtn, stepBtn, stateBtn].forEach((item) => {
+        item.disabled = isBusy;
+      });
+      if (button && label) {
+        button.textContent = label;
+      }
     }
 
     function pretty(value) {
@@ -366,32 +383,52 @@ GET /state</pre>
     }
 
     async function refreshState() {
-      const res = await fetch(`/state?_=${Date.now()}`, { cache: "no-store" });
-      const data = await res.json();
-      stateBox.textContent = pretty(data);
-      responseBox.textContent = pretty({
-        source: "refresh_state",
-        task_id: data.task_id,
-        step_count: data.step_count,
-        score: data.score,
-        resolution_status: data.resolution_status
-      });
-      setMetrics(data);
-      lastRefreshed.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`;
-      setUiStatus("State refreshed successfully.");
+      setBusy(true, stateBtn, "Refreshing...");
+      setUiStatus("Refreshing current state...");
+      try {
+        const res = await fetch(`/state?_=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        stateBox.textContent = pretty(data);
+        responseBox.textContent = pretty({
+          source: "refresh_state",
+          task_id: data.task_id,
+          step_count: data.step_count,
+          score: data.score,
+          resolution_status: data.resolution_status
+        });
+        setMetrics(data);
+        lastRefreshed.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`;
+        setUiStatus("State refreshed successfully.");
+      } catch (error) {
+        responseBox.textContent = `Refresh failed: ${error.message}`;
+        setUiStatus("Refresh State failed.", "warn");
+      } finally {
+        setBusy(false, stateBtn, "Refresh State");
+      }
     }
 
     async function resetTask() {
-      const res = await fetch("/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_id: taskSelect.value })
-      });
-      const data = await res.json();
-      responseBox.textContent = pretty(data);
-      setMetrics(data);
-      setUiStatus(`Task reset: ${data?.visible_case?.task_id || taskSelect.value}`);
-      await refreshState();
+      setBusy(true, resetBtn, "Restarting...");
+      setUiStatus(`Resetting task ${taskSelect.value}...`);
+      try {
+        const res = await fetch("/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task_id: taskSelect.value })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        responseBox.textContent = pretty(data);
+        setMetrics(data);
+        setUiStatus(`Task reset: ${data?.visible_case?.task_id || taskSelect.value}`);
+        await refreshState();
+      } catch (error) {
+        responseBox.textContent = `Reset failed: ${error.message}`;
+        setUiStatus("Reset Task failed.", "warn");
+      } finally {
+        setBusy(false, resetBtn, "Reset Task");
+      }
     }
 
     async function sendStep() {
@@ -413,21 +450,31 @@ GET /state</pre>
       if (referenceId.value.trim()) action.reference_id = referenceId.value.trim();
       if (rationaleBox.value.trim()) action.rationale = rationaleBox.value.trim();
 
-      const res = await fetch("/step", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action })
-      });
-      const data = await res.json();
-      responseBox.textContent = pretty(data);
-      setMetrics(data.observation || data);
-      setUiStatus("Step sent successfully.");
-      await refreshState();
+      setBusy(true, stepBtn, "Sending...");
+      setUiStatus(`Running action ${action.command}...`);
+      try {
+        const res = await fetch("/step", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        responseBox.textContent = pretty(data);
+        setMetrics(data.observation || data);
+        setUiStatus("Step sent successfully.");
+        await refreshState();
+      } catch (error) {
+        responseBox.textContent = `Step failed: ${error.message}`;
+        setUiStatus("Step failed.", "warn");
+      } finally {
+        setBusy(false, stepBtn, "Send Step");
+      }
     }
 
-    document.getElementById("reset-btn").addEventListener("click", resetTask);
-    document.getElementById("step-btn").addEventListener("click", sendStep);
-    document.getElementById("state-btn").addEventListener("click", refreshState);
+    resetBtn.addEventListener("click", resetTask);
+    stepBtn.addEventListener("click", sendStep);
+    stateBtn.addEventListener("click", refreshState);
     taskSelect.addEventListener("change", () => {
       setUiStatus(`Switching to ${taskSelect.value}...`);
       resetTask();
