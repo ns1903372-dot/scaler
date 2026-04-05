@@ -348,7 +348,7 @@ GET /state</pre>
     }
 
     async function loadTasks() {
-      const res = await fetch("/tasks");
+      const res = await fetch(`/tasks?_=${Date.now()}`, { cache: "no-store" });
       const tasks = await res.json();
       taskSelect.innerHTML = "";
       tasks.forEach((task) => {
@@ -360,15 +360,22 @@ GET /state</pre>
     }
 
     async function checkHealth() {
-      const res = await fetch("/health");
+      const res = await fetch(`/health?_=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       healthStatus.textContent = data.status === "ok" ? "API healthy and ready" : "API status unknown";
     }
 
     async function refreshState() {
-      const res = await fetch("/state");
+      const res = await fetch(`/state?_=${Date.now()}`, { cache: "no-store" });
       const data = await res.json();
       stateBox.textContent = pretty(data);
+      responseBox.textContent = pretty({
+        source: "refresh_state",
+        task_id: data.task_id,
+        step_count: data.step_count,
+        score: data.score,
+        resolution_status: data.resolution_status
+      });
       setMetrics(data);
       lastRefreshed.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`;
       setUiStatus("State refreshed successfully.");
