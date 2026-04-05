@@ -421,6 +421,10 @@ GET /state</pre>
     document.getElementById("reset-btn").addEventListener("click", resetTask);
     document.getElementById("step-btn").addEventListener("click", sendStep);
     document.getElementById("state-btn").addEventListener("click", refreshState);
+    taskSelect.addEventListener("change", () => {
+      setUiStatus(`Switching to ${taskSelect.value}...`);
+      resetTask();
+    });
 
     Promise.all([loadTasks(), checkHealth(), refreshState()]).catch(() => {
       setUiStatus("Could not initialize the UI.", "warn");
