@@ -14,45 +14,37 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
     env = env_cls()
     last_error: dict[str, Any] = {}
 
-    class StepBody(BaseModel):
-        action: action_model
-
-    class ResetBody(BaseModel):
-        seed: int | None = None
-        episode_id: str | None = None
-        task_id: str | None = None
-        metadata: dict[str, Any] = {}
-
     @app.get("/api")
     def root() -> dict[str, str]:
         return {"name": env_name, "status": "ok"}
 
     @app.post("/reset")
-    def reset(body: ResetBody | None = Body(default=None)):
+    def reset(body: dict[str, Any] | None = Body(default=None)):
         nonlocal last_error
         try:
-            body = body or ResetBody()
+            body = body or {}
             last_error = {}
             observation = env.reset(
-                seed=body.seed,
-                episode_id=body.episode_id,
-                task_id=body.task_id,
-                **body.metadata,
+                seed=body.get("seed"),
+                episode_id=body.get("episode_id"),
+                task_id=body.get("task_id"),
+                **body.get("metadata", {}),
             )
             return JSONResponse(status_code=200, content=jsonable_encoder(observation))
         except Exception as exc:  # noqa: BLE001
             last_error = {
                 "error": str(exc),
                 "traceback": traceback.format_exc(),
-                "reset_body": body.model_dump() if body else {},
+                "reset_body": body or {},
             }
             return JSONResponse(status_code=500, content=last_error)
 
     @app.post("/step")
-    def step(body: StepBody = Body(...)):
+    def step(body: dict[str, Any] = Body(...)):
         nonlocal last_error
         try:
-            observation = env.step(body.action)
+            action = action_model.model_validate(body.get("action", {}))
+            observation = env.step(action)
             last_error = {}
             payload = {
                 "observation": jsonable_encoder(observation),
@@ -64,7 +56,7 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
             last_error = {
                 "error": str(exc),
                 "traceback": traceback.format_exc(),
-                "action": body.action.model_dump(),
+                "action": body.get("action", {}),
             }
             return JSONResponse(
                 status_code=500,
