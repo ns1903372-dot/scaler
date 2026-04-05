@@ -27,17 +27,26 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
     def root() -> dict[str, str]:
         return {"name": env_name, "status": "ok"}
 
-    @app.post("/reset", response_model=observation_model)
+    @app.post("/reset")
     def reset(body: ResetBody | None = Body(default=None)):
         nonlocal last_error
-        body = body or ResetBody()
-        last_error = {}
-        return env.reset(
-            seed=body.seed,
-            episode_id=body.episode_id,
-            task_id=body.task_id,
-            **body.metadata,
-        )
+        try:
+            body = body or ResetBody()
+            last_error = {}
+            observation = env.reset(
+                seed=body.seed,
+                episode_id=body.episode_id,
+                task_id=body.task_id,
+                **body.metadata,
+            )
+            return JSONResponse(status_code=200, content=jsonable_encoder(observation))
+        except Exception as exc:  # noqa: BLE001
+            last_error = {
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+                "reset_body": body.model_dump() if body else {},
+            }
+            return JSONResponse(status_code=500, content=last_error)
 
     @app.post("/step")
     def step(body: StepBody = Body(...)):
