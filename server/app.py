@@ -234,8 +234,8 @@ UI_HTML = """<!DOCTYPE html>
         </label>
 
         <div class="buttons">
-          <button class="primary" id="reset-btn">Reset Task</button>
-          <button class="ghost" id="state-btn">Refresh State</button>
+          <button type="button" class="primary" id="reset-btn">Reset Task</button>
+          <button type="button" class="ghost" id="state-btn">Refresh State</button>
         </div>
 
         <label>
@@ -276,7 +276,7 @@ UI_HTML = """<!DOCTYPE html>
         </label>
 
         <div class="buttons">
-          <button class="secondary" id="step-btn">Send Step</button>
+          <button type="button" class="secondary" id="step-btn">Send Step</button>
         </div>
 
         <div class="output-box">
@@ -472,9 +472,18 @@ GET /state</pre>
       }
     }
 
-    resetBtn.addEventListener("click", resetTask);
-    stepBtn.addEventListener("click", sendStep);
-    stateBtn.addEventListener("click", refreshState);
+    resetBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      resetTask();
+    });
+    stepBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      sendStep();
+    });
+    stateBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      refreshState();
+    });
     taskSelect.addEventListener("change", () => {
       setUiStatus(`Task selected: ${taskSelect.value}. Click Reset Task to load it.`);
     });
