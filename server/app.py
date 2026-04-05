@@ -541,6 +541,10 @@ GET /state</pre>
 
       setBusy(true, stepBtn, "Sending...");
       setUiStatus(`Running action ${action.command}...`);
+      responseBox.textContent = pretty({
+        source: "step_request",
+        action: action
+      });
       try {
         const res = await fetch("/step", {
           method: "POST",
