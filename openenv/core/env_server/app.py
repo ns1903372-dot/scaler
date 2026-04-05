@@ -11,6 +11,7 @@ from pydantic import BaseModel
 def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: Type[BaseModel], env_name: str = "openenv") -> FastAPI:
     app = FastAPI(title=env_name)
     env = env_cls()
+    last_error: dict[str, Any] = {}
 
     class StepBody(BaseModel):
         action: action_model
@@ -27,7 +28,9 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
 
     @app.post("/reset", response_model=observation_model)
     def reset(body: ResetBody | None = Body(default=None)):
+        nonlocal last_error
         body = body or ResetBody()
+        last_error = {}
         return env.reset(
             seed=body.seed,
             episode_id=body.episode_id,
@@ -37,21 +40,29 @@ def create_app(env_cls: Type, action_model: Type[BaseModel], observation_model: 
 
     @app.post("/step")
     def step(body: StepBody = Body(...)):
+        nonlocal last_error
         try:
             observation = env.step(body.action)
+            last_error = {}
             return {
                 "observation": observation.model_dump(),
                 "reward": observation.reward,
                 "done": observation.done,
             }
         except Exception as exc:  # noqa: BLE001
+            last_error = {
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+                "action": body.action.model_dump(),
+            }
             return JSONResponse(
                 status_code=500,
-                content={
-                    "error": str(exc),
-                    "traceback": traceback.format_exc(),
-                },
+                content=last_error,
             )
+
+    @app.get("/last-error")
+    def get_last_error():
+        return last_error
 
     @app.get("/state")
     def state():

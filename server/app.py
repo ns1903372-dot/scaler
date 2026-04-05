@@ -316,6 +316,13 @@ GET /state</pre>
             <pre id="state-box">No state loaded yet.</pre>
           </div>
         </div>
+
+        <div class="panel panel-pad">
+          <h2>Last Backend Error</h2>
+          <div class="output-box">
+            <pre id="error-box">No backend errors captured.</pre>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -329,6 +336,7 @@ GET /state</pre>
     const rationaleBox = document.getElementById("rationale-box");
     const responseBox = document.getElementById("response-box");
     const stateBox = document.getElementById("state-box");
+    const errorBox = document.getElementById("error-box");
     const healthStatus = document.getElementById("health-status");
     const uiStatus = document.getElementById("ui-status");
     const lastRefreshed = document.getElementById("last-refreshed");
@@ -478,6 +486,9 @@ GET /state</pre>
         setMetrics(data);
         lastRefreshed.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`;
         setUiStatus("State refreshed successfully.");
+        const errorRes = await fetch(`/last-error?_=${Date.now()}`, { cache: "no-store" });
+        const errorData = await errorRes.json();
+        errorBox.textContent = pretty(errorData || { message: "No backend errors captured." });
       } catch (error) {
         responseBox.textContent = `Refresh failed: ${error.message}`;
         setUiStatus("Refresh State failed.", "warn");
@@ -538,11 +549,19 @@ GET /state</pre>
         });
         if (!res.ok) {
           const errorText = await res.text();
+          try {
+            const errorRes = await fetch(`/last-error?_=${Date.now()}`, { cache: "no-store" });
+            const errorData = await errorRes.json();
+            errorBox.textContent = pretty(errorData || { message: "No backend errors captured." });
+          } catch (_) {
+            errorBox.textContent = "Could not load last backend error.";
+          }
           throw new Error(`HTTP ${res.status}: ${errorText}`);
         }
         const data = await res.json();
         responseBox.textContent = pretty(data);
         setMetrics(data.observation || data);
+        errorBox.textContent = "No backend errors captured.";
         setUiStatus("Step sent successfully.");
         await refreshState();
       } catch (error) {
