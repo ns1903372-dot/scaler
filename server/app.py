@@ -150,6 +150,14 @@ UI_HTML = """<!DOCTYPE html>
       font-size: 0.88rem;
       font-weight: 700;
     }
+    .status.is-neutral {
+      background: rgba(36,48,66,0.08);
+      color: #243042;
+    }
+    .status.is-warn {
+      background: rgba(200,103,47,0.12);
+      color: var(--accent-dark);
+    }
     .output-grid {
       display: grid;
       gap: 18px;
@@ -285,6 +293,8 @@ GET /state</pre>
           <div class="metric"><span>Done</span><strong id="metric-done">false</strong></div>
         </div>
 
+        <div class="status is-neutral" id="ui-status">Waiting for an action.</div>
+
         <div class="panel panel-pad">
           <h2>Latest Response</h2>
           <div class="output-box">
@@ -294,6 +304,7 @@ GET /state</pre>
 
         <div class="panel panel-pad">
           <h2>Current State</h2>
+          <p class="hint" id="last-refreshed">Last refreshed: never</p>
           <div class="output-box">
             <pre id="state-box">No state loaded yet.</pre>
           </div>
@@ -312,6 +323,15 @@ GET /state</pre>
     const responseBox = document.getElementById("response-box");
     const stateBox = document.getElementById("state-box");
     const healthStatus = document.getElementById("health-status");
+    const uiStatus = document.getElementById("ui-status");
+    const lastRefreshed = document.getElementById("last-refreshed");
+
+    function setUiStatus(message, tone = "neutral") {
+      uiStatus.textContent = message;
+      uiStatus.className = "status";
+      if (tone === "neutral") uiStatus.classList.add("is-neutral");
+      if (tone === "warn") uiStatus.classList.add("is-warn");
+    }
 
     function pretty(value) {
       return JSON.stringify(value, null, 2);
@@ -350,6 +370,8 @@ GET /state</pre>
       const data = await res.json();
       stateBox.textContent = pretty(data);
       setMetrics(data);
+      lastRefreshed.textContent = `Last refreshed: ${new Date().toLocaleTimeString()}`;
+      setUiStatus("State refreshed successfully.");
     }
 
     async function resetTask() {
@@ -361,6 +383,7 @@ GET /state</pre>
       const data = await res.json();
       responseBox.textContent = pretty(data);
       setMetrics(data);
+      setUiStatus(`Task reset: ${data?.visible_case?.task_id || taskSelect.value}`);
       await refreshState();
     }
 
@@ -370,6 +393,7 @@ GET /state</pre>
         payload = payloadBox.value.trim() ? JSON.parse(payloadBox.value) : {};
       } catch (error) {
         responseBox.textContent = "Payload JSON is invalid. Please fix it before sending.";
+        setUiStatus("Payload JSON is invalid.", "warn");
         return;
       }
 
@@ -390,6 +414,7 @@ GET /state</pre>
       const data = await res.json();
       responseBox.textContent = pretty(data);
       setMetrics(data.observation || data);
+      setUiStatus("Step sent successfully.");
       await refreshState();
     }
 
@@ -397,7 +422,9 @@ GET /state</pre>
     document.getElementById("step-btn").addEventListener("click", sendStep);
     document.getElementById("state-btn").addEventListener("click", refreshState);
 
-    Promise.all([loadTasks(), checkHealth(), refreshState()]);
+    Promise.all([loadTasks(), checkHealth(), refreshState()]).catch(() => {
+      setUiStatus("Could not initialize the UI.", "warn");
+    });
   </script>
 </body>
 </html>
