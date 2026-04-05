@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import os
 from pathlib import Path
 
 import yaml
@@ -42,6 +43,13 @@ def check_imports() -> None:
     importlib.import_module("retail_ops_env.models")
 
 
+def check_required_env_vars() -> None:
+    required = ["API_BASE_URL", "MODEL_NAME", "HF_TOKEN"]
+    missing = [name for name in required if not os.getenv(name)]
+    if missing:
+        raise SystemExit(f"Missing required environment variables: {missing}")
+
+
 def check_http_endpoints() -> None:
     server_app = importlib.import_module("server.app")
     app = server_app.app
@@ -57,6 +65,9 @@ def check_http_endpoints() -> None:
         raise SystemExit(f"/reset returned {reset_response.status_code}")
 
     reset_json = reset_response.json()
+    if reset_json.get("visible_case", {}).get("task_id") != TASKS[0]["id"]:
+        raise SystemExit("/reset did not return the requested task payload")
+
     step_payload = {
         "action": {
             "command": "inspect_case",
@@ -67,6 +78,11 @@ def check_http_endpoints() -> None:
     if step_response.status_code != 200:
         raise SystemExit(f"/step returned {step_response.status_code}")
 
+    step_json = step_response.json()
+    observation = step_json.get("observation", {})
+    if "reward" not in step_json or "done" not in step_json or not observation:
+        raise SystemExit("/step did not return the expected OpenEnv wrapper payload")
+
     state_response = client.get("/state")
     if state_response.status_code != 200:
         raise SystemExit(f"/state returned {state_response.status_code}")
@@ -74,6 +90,8 @@ def check_http_endpoints() -> None:
     state_json = state_response.json()
     if not reset_json or not state_json:
         raise SystemExit("HTTP endpoints returned empty payloads")
+    if state_json.get("task_id") != TASKS[0]["id"]:
+        raise SystemExit("/state did not return the active task id")
 
 
 def check_environment_logic() -> None:
@@ -98,6 +116,7 @@ def main() -> None:
     check_files()
     check_manifest()
     check_imports()
+    check_required_env_vars()
     check_http_endpoints()
     check_environment_logic()
     print("VALIDATION_OK")

@@ -107,6 +107,7 @@ python validate_submission.py
 The validator checks:
 
 - required files
+- required environment variables `API_BASE_URL`, `MODEL_NAME`, and `HF_TOKEN`
 - manifest shape
 - imports
 - live HTTP endpoints `/health`, `/reset`, `/step`, and `/state`

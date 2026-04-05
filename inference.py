@@ -29,7 +29,7 @@ Keep the plan short and deterministic."""
 
 
 def emit(tag: str, payload: dict[str, Any]) -> None:
-    print(f"{tag} {json.dumps(payload, separators=(',', ':'))}")
+    print(f"{tag} {json.dumps(payload, separators=(',', ':'), ensure_ascii=False)}", flush=True)
 
 
 def require_env(name: str) -> str:
@@ -196,6 +196,9 @@ def run_task(client: OpenAI, env: RetailOpsEnvironment, task: dict[str, Any]) ->
 
 
 def main() -> None:
+    require_env("API_BASE_URL")
+    require_env("MODEL_NAME")
+    require_env("HF_TOKEN")
     client = build_client()
     env = RetailOpsEnvironment()
     for task in TASKS:
