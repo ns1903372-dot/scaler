@@ -17,6 +17,10 @@ from retail_ops_env.tasks import TASKS
 ROOT = Path(__file__).resolve().parent
 
 
+def in_open_unit_interval(value: float) -> bool:
+    return 0.0 < float(value) < 1.0
+
+
 def check_files() -> None:
     required = [
         ROOT / "openenv.yaml",
@@ -98,15 +102,15 @@ def check_environment_logic() -> None:
     env = RetailOpsEnvironment()
     for task in TASKS:
         reset_obs = env.reset(task_id=task["id"])
-        if not (0.0 <= reset_obs.score <= 1.0):
-            raise SystemExit(f"Reset score out of range for {task['id']}")
+        if not in_open_unit_interval(reset_obs.score):
+            raise SystemExit(f"Reset score must be strictly between 0 and 1 for {task['id']}")
         inspection = env.step(RetailOpsAction(command="inspect_case"))
-        if not (0.0 <= inspection.score <= 1.0):
-            raise SystemExit(f"Step score out of range for {task['id']}")
+        if not in_open_unit_interval(inspection.score):
+            raise SystemExit(f"Step score must be strictly between 0 and 1 for {task['id']}")
         state = env.state
         score, breakdown = grade_task(task, env._workspace)  # noqa: SLF001 - local validator only
-        if not (0.0 <= score <= 1.0):
-            raise SystemExit(f"Grader score out of range for {task['id']}")
+        if not in_open_unit_interval(score):
+            raise SystemExit(f"Grader score must be strictly between 0 and 1 for {task['id']}")
         if state.task_id != task["id"]:
             raise SystemExit(f"State task mismatch for {task['id']}")
         print(json.dumps({"task_id": task["id"], "score": score, "breakdown": breakdown}, sort_keys=True))
