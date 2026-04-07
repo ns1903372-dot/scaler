@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import Response
 from fastapi.responses import HTMLResponse
 from openenv.core.env_server import create_app
@@ -646,3 +647,11 @@ def health() -> dict[str, str]:
 @app.head("/health")
 def health_head() -> Response:
     return Response(status_code=200)
+
+
+def main() -> None:
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+    main()
