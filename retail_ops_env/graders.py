@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+_MIN_SCORE = 0.01
+_MAX_SCORE = 0.99
+
 
 def _has_message(messages: list[dict[str, Any]], *phrases: str) -> bool:
     lowered = [msg.get("message", "").lower() for msg in messages]
@@ -44,7 +47,11 @@ def grade_task(task: dict[str, Any], workspace: dict[str, Any]) -> tuple[float, 
         return _grade_medium(task, workspace)
     if task_id == "hard_vip_exchange_and_refund":
         return _grade_hard(task, workspace)
-    return 0.0, {"unrecognized_task": 0.0}
+    return _normalize_score(0.0), {"unrecognized_task": 0.0}
+
+
+def _normalize_score(score: float) -> float:
+    return round(min(_MAX_SCORE, max(_MIN_SCORE, score)), 4)
 
 
 def _grade_easy(task: dict[str, Any], workspace: dict[str, Any]) -> tuple[float, dict[str, float]]:
@@ -71,7 +78,7 @@ def _grade_easy(task: dict[str, Any], workspace: dict[str, Any]) -> tuple[float,
     if workspace["refunds"] or workspace["replacements"] or workspace["escalated"]:
         breakdown["final_resolution"] = max(0.0, breakdown["final_resolution"] - 0.1)
 
-    score = max(0.0, min(1.0, round(sum(breakdown.values()), 4)))
+    score = _normalize_score(round(sum(breakdown.values()), 4))
     return score, breakdown
 
 
@@ -102,7 +109,7 @@ def _grade_medium(task: dict[str, Any], workspace: dict[str, Any]) -> tuple[floa
     if workspace["escalated"]:
         breakdown["final_resolution"] = max(0.0, breakdown["final_resolution"] - 0.1)
 
-    score = max(0.0, min(1.0, round(sum(breakdown.values()), 4)))
+    score = _normalize_score(round(sum(breakdown.values()), 4))
     return score, breakdown
 
 
@@ -144,5 +151,5 @@ def _grade_hard(task: dict[str, Any], workspace: dict[str, Any]) -> tuple[float,
     if workspace["escalated"]:
         breakdown["final_resolution"] = max(0.0, breakdown["final_resolution"] - 0.1)
 
-    score = max(0.0, min(1.0, round(sum(breakdown.values()), 4)))
+    score = _normalize_score(round(sum(breakdown.values()), 4))
     return score, breakdown
