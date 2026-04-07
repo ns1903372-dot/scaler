@@ -194,13 +194,16 @@ def run_task(client: OpenAI, env: RetailOpsEnvironment, task: dict[str, Any]) ->
             log_step(step_index, action_to_str(action), reward, bool(observation.done), extract_error(observation))
             final_score = float(getattr(observation, "score", reward))
             if observation.done:
-                success = final_score > 0.0
+                success = final_score >= 0.5
                 break
         else:
-            success = final_score > 0.0
+            success = final_score >= 0.5
     except Exception:
         success = False
     finally:
+        close_fn = getattr(env, "close", None)
+        if callable(close_fn):
+            close_fn()
         log_end(success, steps, final_score, rewards)
 
 
